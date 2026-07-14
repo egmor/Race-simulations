@@ -1,4 +1,8 @@
+import json
+import os
 from random import *
+
+tire = ['soft', 's', 'софт', 'мягкие', 'medium', 'm', 'мудиум', 'средние', 'hard', 'h', 'хард', 'жёсткие']
 
 class Driver:
     def __init__(self, name, power, tire_type, speed, experience, fuel_management, pit_stop_quality, fuel_weight):
@@ -87,26 +91,82 @@ def calculate_laptime(driver: Driver):
 
 
 if __name__ == '__main__':
-
     drivers = []
 
-    grid = int(input('Укажите количество гонщиков на старте гонки: '))
+    best_lap = [100, '']
 
     total_laps = int(input('Укажите из скольки кругов будет состоять гонка: '))
 
-    for i in range(grid):
-        print(f"\n--- Создание гонщика #{i + 1} ---")
-        name = input("Имя пилота: ")
-        power = int(input("Мощность мотора (например, 850): "))
-        tire_type = input("Стартовые шины (Soft/Medium/Hard): ")
-        speed = int(input("Рейтинг скорости (0-100): "))
-        experience = int(input("Рейтинг опыта (0-100): "))
-        fuel_management = float(input("Расход топлива за круг (например, 3.2): "))
-        pit_stop_quality = float(input("Качество пит-стопов команды (0-100): "))
-        fuel_weight = 3.5 * randint(total_laps - 5, total_laps + 5)
+    file_name = "drivers.json"
 
-        single_driver = Driver(name,power,tire_type,speed,experience,fuel_management,pit_stop_quality, fuel_weight)
-        drivers.append(single_driver)
+    print("--- НАСТРОЙКА ПЕЛЕТОНА ---")
+
+    if os.path.exists(file_name):
+        use_file = input(f"Найден файл '{file_name}'. Загрузить гонщиков из него? (y/n): ").strip().lower()
+
+        if use_file == 'y':
+            try:
+                with open(file_name, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                for item in data:
+                    fuel_weight = 3.5 * randint(total_laps - 5, total_laps + 5)
+
+                    single_driver = Driver(
+                        name=item["name"],
+                        power=int(item["power"]),
+                        tire_type=item["tire_type"],
+                        speed=int(item["speed"]),
+                        experience=int(item["experience"]),
+                        fuel_management=float(item["fuel_management"]),
+                        pit_stop_quality=float(item["pit_stop_quality"]),
+                        fuel_weight=fuel_weight
+                    )
+                    drivers.append(single_driver)
+
+                print(f"Успешно загружено гонщиков: {len(drivers)}")
+
+            except Exception as e:
+                print(f"Ошибка при чтении файла: {e}. Переходим к ручному вводу.")
+                drivers = []
+
+    if not drivers:
+        print("\n[!] Запуск ручного создания гонщиков...")
+        grid = int(input('Укажите количество гонщиков на старте гонки: '))
+        total_laps = int(input('Укажите из скольки кругов будет состоять гонка: '))
+
+        for i in range(grid):
+            print(f"\n--- Создание гонщика #{i + 1} ---")
+            name = input("Имя пилота: ")
+            power = int(input("Мощность мотора (например, 850): "))
+            tire_type = input("Стартовые шины (Soft/Medium/Hard): ")
+            speed = int(input("Рейтинг скорости (0-100): "))
+            experience = int(input("Рейтинг опыта (0-100): "))
+            fuel_management = float(input("Расход топлива за круг (например, 3.2): "))
+            pit_stop_quality = float(input("Качество пит-стопов команды (0-100): "))
+            fuel_weight = 4.5 * randint(total_laps - 1, total_laps + 5)
+
+            single_driver = Driver(name, power, tire_type, speed, experience, fuel_management, pit_stop_quality,
+                                   fuel_weight)
+            drivers.append(single_driver)
+
+        save_file = input(
+            f"\nХотите сохранить этих гонщиков в '{file_name}' для будущих гонок? (y/n): ").strip().lower()
+        if save_file == 'y':
+            export_data = []
+            for d in drivers:
+                export_data.append({
+                    "name": d.name,
+                    "power": d.power,
+                    "tire_type": d.tire_type,
+                    "speed": d.speed,
+                    "experience": d.experience,
+                    "fuel_management": d.fuel_management,
+                    "pit_stop_quality": d.pit_stop_quality
+                })
+            with open(file_name, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=4, ensure_ascii=False)
+            print(f"Успешно сохранено в {file_name}!")
 
     for lap in range(1, total_laps + 1):
         standings = sorted(drivers, key=lambda x: x.total_time)
@@ -128,6 +188,11 @@ if __name__ == '__main__':
                             drs_active = True
 
             lap_t = calculate_laptime(d)
+
+            if best_lap[0] > lap_t:
+                best_lap[0] = lap_t
+                best_lap[1] = d.name
+
             if drs_active:
                 lap_t -= 0.6
 
@@ -160,10 +225,17 @@ if __name__ == '__main__':
     for place, d in enumerate(finished_drivers, 1):
         minutes = int(d.total_time // 60)
         seconds = d.total_time % 60
-        print(f"{place}. {d.name} | Итоговое время: {minutes}м {seconds:.3f}с")
+        if seconds < 10: print(f"{place}. {d.name} | Итоговое время: {minutes}.0{seconds:.3f}")
+        else: print(f"{place}. {d.name} | Итоговое время: {minutes}.{seconds:.3f}")
 
     dof_drivers = [d for d in drivers if not d.is_active]
     if dof_drivers:
         print("\n--- НЕ ФИНИШИРОВАЛИ (DNF) ---")
         for d in dof_drivers:
             print(f"• {d.name}")
+
+    print("\n--- ЛУЧШИЙ КРУГ ---")
+    minutes = int(best_lap[0] // 60)
+    seconds = best_lap[0] % 60
+    if seconds < 10: print(f"{best_lap[1]} |  {minutes}.0{seconds:.3f}")
+    else: print(f"{best_lap[1]} |  {minutes}.{seconds:.3f}")
