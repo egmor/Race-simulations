@@ -26,10 +26,20 @@ class Driver:
         self.tire_type = new_tire_type
         self.tire_lap = 0
         self.tire_wear = 100.0
-        tire_change_time = 3.0 - self.pit_stop_quality / 100.0
+        chance_mistake = 100 - self.pit_stop_quality
+        mistake = randint(1, 100)
+        base_change_time = 3.0 - round(uniform(0, (self.pit_stop_quality / 100.0)), 3)
+
+        if mistake <= chance_mistake:
+            mistake_time = round(uniform(1.0, 3.5), 3)
+            tire_change_time = base_change_time + mistake_time
+
+            print(f"[{lap}]  {self.name} заехал на пит-стоп. ЗАМИНКА: +{mistake_time}с (Всего: {tire_change_time:.3f}с) -> {self.tire_type}")
+        else:
+            tire_change_time = base_change_time
+            print(f"[{lap}]  {self.name} заехал на пит-стоп. Чистая работа за {tire_change_time:.3f}с -> {self.tire_type}")
         self.total_time += 20.0 + tire_change_time
         gap += 20.0 + tire_change_time
-        print(f"[{lap}] {self.name} заехал на пит-стоп и переобулся в {self.tire_type}")
         return gap, tire_change_time
 
 
@@ -276,12 +286,12 @@ if __name__ == '__main__':
         else:
             gap_minutes = int((d.total_time - leader_time) // 60)
             gap_seconds = (d.total_time - leader_time) % 60
-            if seconds < 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}.0{seconds:.3f}")
-            elif seconds > 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}.{seconds:.3f}")
-            elif seconds < 10 and gap_seconds < 10:  print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.0{gap_seconds:.3f}| Итоговое время: {minutes}.0{seconds:.3f}")
-            elif seconds > 10 and gap_seconds < 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.0{gap_seconds:.3f}| Итоговое время: {minutes}.{seconds:.3f}")
-            elif seconds < 10 and gap_seconds > 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.{gap_seconds:.3f}| Итоговое время: {minutes}.0{seconds:.3f}")
-            else: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.{gap_seconds:.3f}| Итоговое время: {minutes}.{seconds:.3f}")
+            if seconds < 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
+            elif seconds > 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
+            elif seconds < 10 and gap_seconds < 10:  print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:0{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
+            elif seconds > 10 and gap_seconds < 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:0{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
+            elif seconds < 10 and gap_seconds > 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
+            else: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
 
     dof_drivers = [d for d in drivers if not d.is_active]
     if dof_drivers:
@@ -292,8 +302,8 @@ if __name__ == '__main__':
     print("\n--- ЛУЧШИЙ КРУГ ---")
     minutes = int(best_lap[0] // 60)
     seconds = best_lap[0] % 60
-    if seconds < 10: print(f"{best_lap[1]} | {best_lap[2]} круг |  {minutes}.0{seconds:.3f}")
-    else: print(f"{best_lap[1]} | {best_lap[2]} круг |  {minutes}.{seconds:.3f}")
+    if seconds < 10: print(f"{best_lap[1]} | {best_lap[2]} круг |  {minutes}:0{seconds:.3f}")
+    else: print(f"{best_lap[1]} | {best_lap[2]} круг |  {minutes}:{seconds:.3f}")
 
     print("\n--- ЛУЧШИЙ ПИТ-СТОП ---")
     print(f"{best_pit_stop[2]} | {best_pit_stop[3]} круг | {best_pit_stop[1]} | {best_pit_stop[0]:.3f} ")
