@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from random import *
 
 tire = ['soft', 's', 'софт', 'мягкие', 'medium', 'm', 'мудиум', 'средние', 'hard', 'h', 'хард', 'жёсткие']
@@ -17,6 +18,7 @@ class Driver:
 
         self.tire_lap = 0
         self.total_time = 0.0
+        self.lap_time = 0
         self.tire_wear = 100.0
 
         self.fuel_weight = fuel_weight
@@ -146,7 +148,7 @@ if __name__ == '__main__':
                 drivers = []
 
     if not drivers:
-        print("\n[!] Запуск ручного создания гонщиков...")
+        print("\n[] Запуск ручного создания гонщиков...")
         grid = int(input('Укажите количество гонщиков на старте гонки: '))
 
         for i in range(grid):
@@ -196,45 +198,81 @@ if __name__ == '__main__':
                 if new_driver["name"] not in existing_names:
                     existing_data.append(new_driver)
                 else:
-                    print(f"[!] Пилот {new_driver['name']} уже есть в файле. Пропускаем дубликат.")
+                    print(f"[] Пилот {new_driver['name']} уже есть в файле. Пропускаем дубликат.")
 
             try:
                 with open(file_name, 'w', encoding='utf-8') as f:
                     json.dump(existing_data, f, indent=4, ensure_ascii=False)
-                print(f"База данных успешно обновлена в {file_name}! Всего пилотов: {len(existing_data)}")
+                print(f"База данных успешно обновлена в {file_name} Всего пилотов: {len(existing_data)}")
             except Exception as e:
                 print(f"Не удалось сохранить данные в файл: {e}")
 
     for lap in range(1, total_laps + 1):
         standings = sorted(drivers, key=lambda x: x.total_time)
 
-        for d in drivers:
+        start_lap_times = {drv.name: drv.total_time for drv in drivers}
+
+        for d in standings:
             if not d.is_active:
                 continue
 
             drs_active = False
+            overtaking = False
             gap = 10.0
+            d.lap_time = calculate_laptime(d)
 
             if lap > 1:
                 current_pos = standings.index(d)
                 if current_pos > 0:
                     previous_driver = standings[current_pos - 1]
                     if previous_driver.is_active:
-                        gap = d.total_time - previous_driver.total_time
+                        gap = start_lap_times[d.name] - start_lap_times[previous_driver.name]
+
                         if 0 < gap <= 1.0:
                             drs_active = True
 
-            lap_t = calculate_laptime(d)
+                            speed_advantage = previous_driver.lap_time - d.lap_time
+
+                            if randint(1, 200) == 12:
+                                previous_driver.is_active = False
+                                d.is_active = False
+                                print(
+                                    f"[{lap}]  {d.name} жестко атаковал {previous_driver.name} в зоне DRS. Двойной сход.")
+                                continue
+
+                            elif randint(1, 20) == 7:
+                                previous_driver.total_time += 1.5
+                                d.lap_time += 4.5
+                                print(
+                                    f"[{lap}]  {d.name} зацепил машину {previous_driver.name} при попытке обгона. Оба теряют время.")
+
+                            # Если обгон успешен — ставим overtaking = True, чтобы сработал бонус скорости ниже
+                            elif (speed_advantage > 0 and randint(1, 4) == 2) or (randint(1, 5) <= 3):
+                                overtaking = True
+                                print(f"[{lap}]  {d.name} проходит {previous_driver.name} в конце прямой")
+
+                            elif randint(1, 100) <= 8:
+                                mistake_time = round(uniform(0.5, 1.5), 3)
+                                previous_driver.lap_time += mistake_time
+                                print(
+                                    f"[{lap}]  {previous_driver.name} ошибся под давлением {d.name} и потерял +{mistake_time}с")
+
+                            else:
+                                d.lap_time = previous_driver.lap_time + round(uniform(0.1, 0.35), 3)
+                                print(f"[{lap}]  {d.name} застрял за {previous_driver.name} и теряет темп.")
 
             if drs_active:
-                lap_t -= 0.6
+                d.lap_time -= 0.6
 
-            if best_lap[0] > lap_t:
-                best_lap[0] = lap_t
+            if overtaking:
+                d.lap_time -= 0.1
+
+            if best_lap[0] > d.lap_time:
+                best_lap[0] = d.lap_time
                 best_lap[1] = d.name
                 best_lap[2] = lap
 
-            d.total_time += lap_t
+            d.total_time += d.lap_time
             d.tire_lap += 1
             tire_degradation(d, gap)
 
@@ -244,8 +282,10 @@ if __name__ == '__main__':
 
             if d.tire_wear < 30 and (total_laps - lap) > 6:
                 if d.tire_type == 'Soft':
-                    if (total_laps - lap) > 20: new_tire = 'Hard'
-                    else: new_tire = 'Medium'
+                    if (total_laps - lap) > 20:
+                        new_tire = 'Hard'
+                    else:
+                        new_tire = 'Medium'
                     gap, pit_stop = d.make_pitstop(lap, new_tire, gap)
                     if best_pit_stop[0] > pit_stop:
                         best_pit_stop[0] = pit_stop
@@ -253,8 +293,10 @@ if __name__ == '__main__':
                         best_pit_stop[2] = d.team
                         best_pit_stop[3] = lap
                 elif d.tire_type == 'Medium':
-                    if (total_laps - lap) > 20: new_tire = 'Hard'
-                    else: new_tire = 'Soft'
+                    if (total_laps - lap) > 20:
+                        new_tire = 'Hard'
+                    else:
+                        new_tire = 'Soft'
                     gap, pit_stop = d.make_pitstop(lap, new_tire, gap)
                     if best_pit_stop[0] > pit_stop:
                         best_pit_stop[0] = pit_stop
@@ -262,14 +304,33 @@ if __name__ == '__main__':
                         best_pit_stop[2] = d.team
                         best_pit_stop[3] = lap
                 elif d.tire_type == 'Hard':
-                    if (total_laps - lap) > 15: new_tire = 'Medium'
-                    else: new_tire = 'Soft'
+                    if (total_laps - lap) > 15:
+                        new_tire = 'Medium'
+                    else:
+                        new_tire = 'Soft'
                     gap, pit_stop = d.make_pitstop(lap, new_tire, gap)
                     if best_pit_stop[0] > pit_stop:
                         best_pit_stop[0] = pit_stop
                         best_pit_stop[1] = d.name
                         best_pit_stop[2] = d.team
                         best_pit_stop[3] = lap
+
+        active_standings = sorted([drv for drv in drivers if drv.is_active], key=lambda x: x.total_time)
+
+        time.sleep(3.0)
+
+        print(f"\n================ КОНЕЦ {lap} КРУГА ================")
+        print("Текущий Топ-10:")
+        for place, drv in enumerate(active_standings[:10], 1):
+            if place == 1:
+                print(f" {place}.  {drv.name:20} ({drv.team}) | Interval")
+            else:
+                gap = drv.total_time - active_standings[place - 2].total_time
+                time.sleep(gap * 0.2)
+                print(f" {place}. {drv.name:20} ({drv.team}) | +{gap:.3f}с")
+        print("==================================================\n")
+
+
 
     finished_drivers = [d for d in drivers if d.is_active]
     finished_drivers.sort(key=lambda x: x.total_time)
