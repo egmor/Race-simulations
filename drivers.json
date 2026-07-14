@@ -1,42 +1,52 @@
 [
-  {
-    "name": "Emiliano Rossi",
-    "team": "Audi",
-    "power": 995,
-    "tire_type": "Soft",
-    "speed": 75,
-    "experience": 65,
-    "fuel_management": 3.0,
-    "pit_stop_quality": 70.0
-  },
-  {
-    "name": "Henry Virmus",
-    "team": "McLaren",
-    "power": 1000,
-    "tire_type": "Medium",
-    "speed": 85,
-    "experience": 70,
-    "fuel_management": 3.4,
-    "pit_stop_quality": 80.0
-  },
-  {
-    "name": "Alessio Bianki",
-    "team": "Ferrari",
-    "power": 1000,
-    "tire_type": "Medium",
-    "speed": 90,
-    "experience": 65,
-    "fuel_management": 3.2,
-    "pit_stop_quality": 90.0
-  },
-  {
-    "name": "Mateo Rotti",
-    "team": "Ferrari",
-    "power": 1000,
-    "tire_type": "Soft",
-    "speed": 80,
-    "experience": 30,
-    "fuel_management": 3.6,
-    "pit_stop_quality": 90.0
-  }
+    {
+        "name": "Emiliano Rossi",
+        "team": "Audi",
+        "power": 995,
+        "tire_type": "Soft",
+        "speed": 75,
+        "experience": 65,
+        "fuel_management": 3.0,
+        "pit_stop_quality": 70.0
+    },
+    {
+        "name": "Henry Virmus",
+        "team": "McLaren",
+        "power": 1000,
+        "tire_type": "Medium",
+        "speed": 85,
+        "experience": 70,
+        "fuel_management": 3.4,
+        "pit_stop_quality": 80.0
+    },
+    {
+        "name": "Alessio Bianki",
+        "team": "Ferrari",
+        "power": 1000,
+        "tire_type": "Medium",
+        "speed": 90,
+        "experience": 65,
+        "fuel_management": 3.2,
+        "pit_stop_quality": 90.0
+    },
+    {
+        "name": "Mateo Rotti",
+        "team": "Ferrari",
+        "power": 1000,
+        "tire_type": "Soft",
+        "speed": 80,
+        "experience": 30,
+        "fuel_management": 3.6,
+        "pit_stop_quality": 90.0
+    },
+    {
+        "name": "Roman Rictor",
+        "team": "Haas Toyota ",
+        "power": 1000,
+        "tire_type": "Medium",
+        "speed": 65,
+        "experience": 75,
+        "fuel_management": 2.9,
+        "pit_stop_quality": 80.0
+    }
 ]

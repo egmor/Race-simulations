@@ -5,8 +5,9 @@ from random import *
 tire = ['soft', 's', 'софт', 'мягкие', 'medium', 'm', 'мудиум', 'средние', 'hard', 'h', 'хард', 'жёсткие']
 
 class Driver:
-    def __init__(self, name, power, tire_type, speed, experience, fuel_management, pit_stop_quality, fuel_weight):
+    def __init__(self, name, team, power, tire_type, speed, experience, fuel_management, pit_stop_quality, fuel_weight):
         self.name = name
+        self.team = team
         self.power = power
         self.tire_type = tire_type
         self.speed = speed
@@ -21,13 +22,15 @@ class Driver:
         self.fuel_weight = fuel_weight
         self.is_active = True
 
-    def make_pitstop(self, lap, new_tire_type):
+    def make_pitstop(self, lap, new_tire_type, gap):
         self.tire_type = new_tire_type
         self.tire_lap = 0
         self.tire_wear = 100.0
         tire_change_time = 3.0 - self.pit_stop_quality / 100.0
         self.total_time += 20.0 + tire_change_time
-        print(f"[{lap}] {self.name} заехал на пит-стоп и переобулся в {self.tire_type}!")
+        gap += 20.0 + tire_change_time
+        print(f"[{lap}] {self.name} заехал на пит-стоп и переобулся в {self.tire_type}")
+        return gap, tire_change_time
 
 
 def tire_degradation(driver: Driver, gap):
@@ -93,7 +96,8 @@ def calculate_laptime(driver: Driver):
 if __name__ == '__main__':
     drivers = []
 
-    best_lap = [100, '']
+    best_lap = [100, '', 0]
+    best_pit_stop = [100, '', '', 0]
 
     total_laps = int(input('Укажите из скольки кругов будет состоять гонка: '))
 
@@ -110,10 +114,11 @@ if __name__ == '__main__':
                     data = json.load(f)
 
                 for item in data:
-                    fuel_weight = 3.5 * randint(total_laps - 5, total_laps + 5)
+                    fuel_weight = 4.5 * randint(total_laps - 5, total_laps + 5)
 
                     single_driver = Driver(
                         name=item["name"],
+                        team=item["team"],
                         power=int(item["power"]),
                         tire_type=item["tire_type"],
                         speed=int(item["speed"]),
@@ -133,11 +138,11 @@ if __name__ == '__main__':
     if not drivers:
         print("\n[!] Запуск ручного создания гонщиков...")
         grid = int(input('Укажите количество гонщиков на старте гонки: '))
-        total_laps = int(input('Укажите из скольки кругов будет состоять гонка: '))
 
         for i in range(grid):
             print(f"\n--- Создание гонщика #{i + 1} ---")
             name = input("Имя пилота: ")
+            team = input("Название команды: ")
             power = int(input("Мощность мотора (например, 850): "))
             tire_type = input("Стартовые шины (Soft/Medium/Hard): ")
             speed = int(input("Рейтинг скорости (0-100): "))
@@ -146,17 +151,18 @@ if __name__ == '__main__':
             pit_stop_quality = float(input("Качество пит-стопов команды (0-100): "))
             fuel_weight = 4.5 * randint(total_laps - 1, total_laps + 5)
 
-            single_driver = Driver(name, power, tire_type, speed, experience, fuel_management, pit_stop_quality,
+            single_driver = Driver(name, team, power, tire_type, speed, experience, fuel_management, pit_stop_quality,
                                    fuel_weight)
             drivers.append(single_driver)
 
         save_file = input(
             f"\nХотите сохранить этих гонщиков в '{file_name}' для будущих гонок? (y/n): ").strip().lower()
         if save_file == 'y':
-            export_data = []
+            new_export_data = []
             for d in drivers:
-                export_data.append({
+                new_export_data.append({
                     "name": d.name,
+                    "team": d.team,
                     "power": d.power,
                     "tire_type": d.tire_type,
                     "speed": d.speed,
@@ -164,9 +170,30 @@ if __name__ == '__main__':
                     "fuel_management": d.fuel_management,
                     "pit_stop_quality": d.pit_stop_quality
                 })
-            with open(file_name, 'w', encoding='utf-8') as f:
-                json.dump(export_data, f, indent=4, ensure_ascii=False)
-            print(f"Успешно сохранено в {file_name}!")
+
+            existing_data = []
+            if os.path.exists(file_name):
+                try:
+                    with open(file_name, 'r', encoding='utf-8') as f:
+                        existing_data = json.load(f)
+                        if not isinstance(existing_data, list):
+                            existing_data = []
+                except Exception:
+                    existing_data = []
+
+            existing_names = {item["name"] for item in existing_data}
+            for new_driver in new_export_data:
+                if new_driver["name"] not in existing_names:
+                    existing_data.append(new_driver)
+                else:
+                    print(f"[!] Пилот {new_driver['name']} уже есть в файле. Пропускаем дубликат.")
+
+            try:
+                with open(file_name, 'w', encoding='utf-8') as f:
+                    json.dump(existing_data, f, indent=4, ensure_ascii=False)
+                print(f"База данных успешно обновлена в {file_name}! Всего пилотов: {len(existing_data)}")
+            except Exception as e:
+                print(f"Не удалось сохранить данные в файл: {e}")
 
     for lap in range(1, total_laps + 1):
         standings = sorted(drivers, key=lambda x: x.total_time)
@@ -189,44 +216,72 @@ if __name__ == '__main__':
 
             lap_t = calculate_laptime(d)
 
+            if drs_active:
+                lap_t -= 0.6
+
             if best_lap[0] > lap_t:
                 best_lap[0] = lap_t
                 best_lap[1] = d.name
-
-            if drs_active:
-                lap_t -= 0.6
+                best_lap[2] = lap
 
             d.total_time += lap_t
             d.tire_lap += 1
             tire_degradation(d, gap)
 
+            if d.fuel_weight < d.fuel_management:
+                print(f"[{lap}] === {d.name} СХОД: Закончилось топливо ===")
+                d.is_active = False
+
             if d.tire_wear < 30 and (total_laps - lap) > 6:
                 if d.tire_type == 'Soft':
                     if (total_laps - lap) > 20: new_tire = 'Hard'
                     else: new_tire = 'Medium'
-                    d.make_pitstop(lap, new_tire)
+                    gap, pit_stop = d.make_pitstop(lap, new_tire, gap)
+                    if best_pit_stop[0] > pit_stop:
+                        best_pit_stop[0] = pit_stop
+                        best_pit_stop[1] = d.name
+                        best_pit_stop[2] = d.team
+                        best_pit_stop[3] = lap
                 elif d.tire_type == 'Medium':
                     if (total_laps - lap) > 20: new_tire = 'Hard'
                     else: new_tire = 'Soft'
-                    d.make_pitstop(lap, new_tire)
+                    gap, pit_stop = d.make_pitstop(lap, new_tire, gap)
+                    if best_pit_stop[0] > pit_stop:
+                        best_pit_stop[0] = pit_stop
+                        best_pit_stop[1] = d.name
+                        best_pit_stop[2] = d.team
+                        best_pit_stop[3] = lap
                 elif d.tire_type == 'Hard':
                     if (total_laps - lap) > 15: new_tire = 'Medium'
                     else: new_tire = 'Soft'
-                    d.make_pitstop(lap, new_tire)
-
-            if d.fuel_weight < d.fuel_management:
-                print(f"[{lap}] === {d.name} СХОД: Закончилось топливо! ===")
-                d.is_active = False
+                    gap, pit_stop = d.make_pitstop(lap, new_tire, gap)
+                    if best_pit_stop[0] > pit_stop:
+                        best_pit_stop[0] = pit_stop
+                        best_pit_stop[1] = d.name
+                        best_pit_stop[2] = d.team
+                        best_pit_stop[3] = lap
 
     finished_drivers = [d for d in drivers if d.is_active]
     finished_drivers.sort(key=lambda x: x.total_time)
+
+    leader_time = finished_drivers[0].total_time
 
     print("\n--- ИТОГОВЫЕ РЕЗУЛЬТАТЫ ---")
     for place, d in enumerate(finished_drivers, 1):
         minutes = int(d.total_time // 60)
         seconds = d.total_time % 60
-        if seconds < 10: print(f"{place}. {d.name} | Итоговое время: {minutes}.0{seconds:.3f}")
-        else: print(f"{place}. {d.name} | Итоговое время: {minutes}.{seconds:.3f}")
+        if d.total_time == leader_time:
+            if seconds < 10: print(f"{place}. {d.name:20} | Итоговое время: {minutes}.0{seconds:.3f}")
+            else: print(f"{place}. {d.name:20} | Итоговое время: {minutes}.{seconds:.3f}")
+        else:
+            gap_minutes = int((d.total_time - leader_time) // 60)
+            gap_seconds = (d.total_time - leader_time) % 60
+            if seconds < 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}.0{seconds:.3f}")
+            elif seconds > 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}.{seconds:.3f}")
+            elif seconds < 10 and gap_seconds < 10:  print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.0{gap_seconds:.3f}| Итоговое время: {minutes}.0{seconds:.3f}")
+            elif seconds > 10 and gap_seconds < 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.0{gap_seconds:.3f}| Итоговое время: {minutes}.{seconds:.3f}")
+            elif seconds < 10 and gap_seconds > 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.{gap_seconds:.3f}| Итоговое время: {minutes}.0{seconds:.3f}")
+            else: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}.{gap_seconds:.3f}| Итоговое время: {minutes}.{seconds:.3f}")
 
     dof_drivers = [d for d in drivers if not d.is_active]
     if dof_drivers:
@@ -237,5 +292,8 @@ if __name__ == '__main__':
     print("\n--- ЛУЧШИЙ КРУГ ---")
     minutes = int(best_lap[0] // 60)
     seconds = best_lap[0] % 60
-    if seconds < 10: print(f"{best_lap[1]} |  {minutes}.0{seconds:.3f}")
-    else: print(f"{best_lap[1]} |  {minutes}.{seconds:.3f}")
+    if seconds < 10: print(f"{best_lap[1]} | {best_lap[2]} круг |  {minutes}.0{seconds:.3f}")
+    else: print(f"{best_lap[1]} | {best_lap[2]} круг |  {minutes}.{seconds:.3f}")
+
+    print("\n--- ЛУЧШИЙ ПИТ-СТОП ---")
+    print(f"{best_pit_stop[2]} | {best_pit_stop[3]} круг | {best_pit_stop[1]} | {best_pit_stop[0]:.3f} ")
