@@ -112,7 +112,7 @@ def calculate_laptime(driver: Driver):
 
     random_range = 0.35 - (driver.experience / 100.0) * 0.30
     lap_time = uniform(lap_time - random_range, lap_time + random_range)
-    
+
     return lap_time
 
 
@@ -137,6 +137,95 @@ def retire(driver: Driver, lap, total_lap, choice):
     return False
 
 
+def run_qualifying(drivers, choice):
+    saved_state = {d.name: (d.fuel_weight, d.tire_wear, d.tire_lap, d.total_time) for d in drivers}
+
+    n = len(drivers)
+    session_drivers = list(drivers)
+    session_groups = []
+
+    if n <= 3:
+        sessions = [("Q", None)]
+    else:
+        q1_cut = max(3, round(n * 0.75))
+        q2_cut = max(3, round(n * 0.5))
+        if q2_cut >= q1_cut:
+            q2_cut = max(3, q1_cut - 1)
+        sessions = [("Q1", min(q1_cut, n)), ("Q2", min(q2_cut, n)), ("Q3", None)]
+
+    if choice == "First":
+        print("\n" + "=" * 55)
+        print("КВАЛИФИКАЦИЯ")
+        print("=" * 55)
+
+    for label, cutoff in sessions:
+        if not session_drivers:
+            break
+
+        if choice == "First":
+            print(f"\n--- Сессия {label} ---")
+
+        best_laps = {}
+        for d in session_drivers:
+            best_time = None
+            for _ in range(3):
+                d.tire_type = "Soft"
+                d.tire_wear = 100.0
+                d.tire_lap = 0
+                lap_time = calculate_laptime(d)
+                if best_time is None or lap_time < best_time:
+                    best_time = lap_time
+            best_laps[d.name] = best_time
+
+        session_drivers.sort(key=lambda x: best_laps[x.name])
+
+        if choice == "First":
+            for pos, d in enumerate(session_drivers, 1):
+                minutes = int(best_laps[d.name] // 60)
+                seconds = best_laps[d.name] % 60
+                print(f"{pos:2}. {d.name:20} | {d.team:15} | {minutes}:0{seconds:.3f}с")
+
+        if cutoff is not None and cutoff < len(session_drivers):
+            advancing = session_drivers[:cutoff]
+            out = session_drivers[cutoff:]
+            session_groups.append([(d, best_laps[d.name]) for d in out])
+            if choice == "First":
+                print("Не прошли отбор: " + ", ".join(d.name for d in out))
+            session_drivers = advancing
+        else:
+            session_groups.append([(d, best_laps[d.name]) for d in session_drivers])
+            session_drivers = []
+
+        time.sleep(4)
+
+    grid_order = []
+    for group in reversed(session_groups):
+        grid_order.extend(group)
+
+    for d in drivers:
+        fuel, wear, tlap, ttime = saved_state[d.name]
+        d.fuel_weight = fuel
+        d.tire_wear = wear
+        d.tire_lap = tlap
+        d.total_time = ttime
+
+    print("\n" + "=" * 55)
+    print("СТАРТОВАЯ РЕШЁТКА")
+    print("=" * 55)
+    for pos, (d, t) in enumerate(grid_order, 1):
+        pole_mark = "  <-- POLE POSITION" if pos == 1 else ""
+        minutes = int(t // 60)
+        seconds = t % 60
+        if seconds < 10:
+            print(f"{pos:2}. {d.name:20} | {d.team:15} |  {minutes}:0{seconds:.3f}с{pole_mark}")
+        else: print(f"{pos:2}. {d.name:20} | {d.team:15} |  {minutes}:{seconds:.3f}с{pole_mark}")
+    print("=" * 55 + "\n")
+
+    time.sleep(4)
+
+    return [d for d, _ in grid_order]
+
+
 def check_safety_car(out_drivers, lap, current_vsc, current_sc, current_rf):
     if out_drivers:
         if not (current_vsc or current_sc or current_rf):
@@ -151,6 +240,8 @@ def check_safety_car(out_drivers, lap, current_vsc, current_sc, current_rf):
                 return False, False, True, lap
 
     return current_vsc, current_sc, current_rf, 0
+
+
 
 
 if __name__ == '__main__':
@@ -214,6 +305,8 @@ if __name__ == '__main__':
             drivers.append(single_driver)
 
     choice = input("Вы хотите видеть подробную гонку по кругам или сразу результат? (First/Second) ").strip()
+
+    drivers = run_qualifying(drivers, choice)
 
     VSC = SC = RF = False
     safety_lap = 0
@@ -338,7 +431,7 @@ if __name__ == '__main__':
         active_standings = sorted([drv for drv in drivers if drv.is_active], key=lambda x: x.total_time)
 
         if choice == "First":
-            time.sleep(2)
+            time.sleep(4)
             print(f"\n================ КОНЕЦ {lap} КРУГА ================")
             if VSC:
                 print(" РЕЖИМ VSC (Ограничение скорости на 40%) ")
@@ -353,7 +446,7 @@ if __name__ == '__main__':
                     time.sleep(gap * 0.15 if not SC else 0.05)
                     print(f" {place}. {drv.name:20} ({drv.team}) | +{gap:.3f}с")
             print("==================================================\n")
-
+            time.sleep(4)
         new_vsc, new_sc, new_rf, trigger_lap = check_safety_car(out_drivers, lap, VSC, SC, RF)
         if trigger_lap > 0:
             VSC, SC, RF = new_vsc, new_sc, new_rf
@@ -382,12 +475,12 @@ if __name__ == '__main__':
             else:
                 gap_minutes = int((d.total_time - leader_time) // 60)
                 gap_seconds = (d.total_time - leader_time) % 60
-                if seconds < 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
-                elif seconds > 10 and gap_minutes == 0: print(f"{place}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
-                elif seconds < 10 and gap_seconds < 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:0{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
-                elif seconds > 10 and gap_seconds < 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:0{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
-                elif seconds < 10 and gap_seconds > 10: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
-                else: print(f"{place}. {d.name:20} | Отставание: +{gap_minutes}:{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
+                if seconds < 10 and gap_minutes == 0: print(f"{place:2}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
+                elif seconds > 10 and gap_minutes == 0: print(f"{place:2}. {d.name:20} | Отставание: +{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
+                elif seconds < 10 and gap_seconds < 10: print(f"{place:2}. {d.name:20} | Отставание: +{gap_minutes}:0{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
+                elif seconds > 10 and gap_seconds < 10: print(f"{place:2}. {d.name:20} | Отставание: +{gap_minutes}:0{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
+                elif seconds < 10 and gap_seconds > 10: print(f"{place:2}. {d.name:20} | Отставание: +{gap_minutes}:{gap_seconds:.3f}| Итоговое время: {minutes}:0{seconds:.3f}")
+                else: print(f"{place:2}. {d.name:20} | Отставание: +{gap_minutes}:{gap_seconds:.3f}| Итоговое время: {minutes}:{seconds:.3f}")
 
     dof_drivers = [d for d in drivers if not d.is_active]
     if dof_drivers:
